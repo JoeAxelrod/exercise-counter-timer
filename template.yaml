@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Exercise Timer App - Serverless API with Cost Protection
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Deployment stage
+
+Globals:
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type'"
+      AllowOrigin: "'*'"
+
+Resources:
+  # Lambda function for API
+  ExerciseTimerAPI:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub exercise-timer-api-${Stage}
+      Runtime: nodejs18.x
+      Handler: lambda.handler
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+          COUNTER_BUCKET_NAME: !Ref CounterBucket
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub arn:aws:s3:::exercise-timer-counters-${Stage}/*
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource: !Sub arn:aws:s3:::exercise-timer-counters-${Stage}
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+  # S3 bucket for counter storage
+  CounterBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub exercise-timer-counters-${Stage}
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ServerlessRestApi.Stage}/
+  CounterBucketName:
+    Description: S3 bucket for counters
+    Value: !Ref CounterBucket

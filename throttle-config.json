@@ -1,0 +1,23 @@
+[
+  {
+    "op": "replace",
+    "path": "/throttle/burstLimit",
+    "value": "10"
+  },
+  {
+    "op": "replace",
+    "path": "/throttle/rateLimit",
+    "value": "5"
+  },
+  {
+    "op": "replace",
+    "path": "/quota/limit",
+    "value": "10000"
+  },
+  {
+    "op": "replace",
+    "path": "/quota/period",
+    "value": "MONTH"
+  }
+]
+
