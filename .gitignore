@@ -58,6 +58,7 @@ temp/
 
 # Counter data (local development)
 counter.json
+users/
 
 # Backup files
 *.bak
@@ -119,7 +120,7 @@ dist
 
 # Gatsby
 .cache/
-public
+# public
 
 # Storybook
 .out

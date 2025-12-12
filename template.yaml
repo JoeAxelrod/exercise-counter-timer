@@ -29,6 +29,7 @@ Resources:
         Variables:
           STAGE: !Ref Stage
           COUNTER_BUCKET_NAME: !Ref CounterBucket
+          SAM_LOCAL: "false"
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -42,6 +43,11 @@ Resources:
                 - s3:ListBucket
               Resource: !Sub arn:aws:s3:::exercise-timer-counters-${Stage}
       Events:
+        ApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
         Api:
           Type: Api
           Properties:

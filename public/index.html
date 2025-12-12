@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pull-Ups Timer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="loader-overlay" id="loaderOverlay" style="display: none;">
+    <div class="loader"></div>
+  </div>
+  <div class="container">
+    <h1>Exercise Timer</h1>
+    <div class="user-id-display" id="userIdDisplay"></div>
+    <div class="timer-display" id="timer">06:00</div>
+    
+    <div class="settings-section">
+      <div class="setting-item">
+        <label for="incrementValue">Increment per click:</label>
+        <input type="number" id="incrementValue" min="1" max="100" value="12" class="increment-input">
+      </div>
+      <div class="setting-item">
+        <label for="timerDuration">Rest timer (minutes):</label>
+        <input type="number" id="timerDuration" min="1" max="60" value="6" class="increment-input">
+      </div>
+    </div>
+    
+    <div class="exercises-section">
+      <h2>Exercises</h2>
+      <div class="exercises-grid" id="exercisesGrid">
+        <!-- Exercise buttons will be generated here -->
+      </div>
+    </div>
+    
+    <div class="action-buttons">
+      <button class="stop-button" id="stopAlarmBtn" style="display: none;">Stop Alarm</button>
+      <button class="reset-timer-button" id="resetTimerBtn" style="display: none;">Reset Timer</button>
+      <button class="reset-button" id="resetCountersBtn" style="display: none;">Reset All Counters</button>
+    </div>
+  </div>
+  <audio id="alarmSound" preload="auto" loop>
+    <source src="alarm.mp3" type="audio/mpeg">
+  </audio>
+  <script src="app.js"></script>
+</body>
+</html>
+

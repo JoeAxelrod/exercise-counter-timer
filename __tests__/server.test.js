@@ -21,9 +21,7 @@ function createTestServer() {
     'pull-ups': 0,
     'squats': 0,
     'chest-dumbbells': 0,
-    'push-ups': 0,
-    'lunges': 0,
-    'planks': 0
+    'sit-ups': 0
   };
   
   // Mock file operations
@@ -88,9 +86,7 @@ describe('Server API Tests', () => {
       'pull-ups': 0,
       'squats': 0,
       'chest-dumbbells': 0,
-      'push-ups': 0,
-      'lunges': 0,
-      'planks': 0
+      'sit-ups': 0
     };
     mockFileExists = true;
   });

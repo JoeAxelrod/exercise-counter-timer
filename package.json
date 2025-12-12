@@ -5,6 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:sam": "sam build && sam local start-api --port 7777 --env-vars sam-local-env.json",
+    "start:sam:watch": "sam build && sam local start-api --port 7777 --env-vars sam-local-env.json --warm-containers EAGER",
+    "start:ui": "npx http-server public -p 3000 -c-1",
+    "start:dev": "echo '⚠️  Run in 2 terminals:\\nTerminal 1: npm run start:sam:watch\\nTerminal 2: npm run start:ui'",
     "test": "jest",
     "test:watch": "jest --watchAll",
     "test:coverage": "jest --coverage",
