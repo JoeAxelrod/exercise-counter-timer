@@ -4,13 +4,53 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pull-Ups Timer</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="loader-overlay" id="loaderOverlay" style="display: none;">
     <div class="loader"></div>
   </div>
-  <div class="container">
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="authModal" style="display: none;">
+    <div class="auth-content">
+      <h2 id="authTitle">Sign In</h2>
+      <div id="authError" class="auth-error" style="display: none;"></div>
+      
+      <!-- Sign In Form -->
+      <div id="signInForm">
+        <input type="email" id="signInEmail" placeholder="Email" class="auth-input">
+        <input type="password" id="signInPassword" placeholder="Password" class="auth-input">
+        <button class="auth-button" id="signInBtn">Sign In</button>
+        <div class="auth-links">
+          <a href="#" id="showSignUp">Don't have an account? Sign up</a>
+        </div>
+      </div>
+      
+      <!-- Sign Up Form -->
+      <div id="signUpForm" style="display: none;">
+        <input type="email" id="signUpEmail" placeholder="Email" class="auth-input">
+        <input type="password" id="signUpPassword" placeholder="Password (min 8 characters)" class="auth-input">
+        <button class="auth-button" id="signUpBtn">Sign Up</button>
+        <div class="auth-links">
+          <a href="#" id="showSignIn">Already have an account? Sign in</a>
+        </div>
+      </div>
+      
+      <!-- Verification Form -->
+      <div id="verifyForm" style="display: none;">
+        <p>Check your email for a verification code</p>
+        <input type="text" id="verifyCode" placeholder="Verification Code" class="auth-input">
+        <button class="auth-button" id="verifyBtn">Verify</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" id="mainContainer" style="display: none;">
+    <div class="auth-header">
+      <span class="user-email" id="userEmail"></span>
+      <button class="sign-out-button" id="signOutBtn">Sign Out</button>
+    </div>
     <h1>Exercise Timer</h1>
     <div class="user-id-display" id="userIdDisplay"></div>
     <div class="timer-display" id="timer">06:00</div>
@@ -42,6 +82,8 @@
   <audio id="alarmSound" preload="auto" loop>
     <source src="alarm.mp3" type="audio/mpeg">
   </audio>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

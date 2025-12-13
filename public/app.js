@@ -38,12 +38,13 @@ function hideLoader() {
   }
 }
 
-// API Base URL - empty for local development, set to AWS API Gateway URL for production
-// For deployment: Replace YOUR_API_GATEWAY_URL with your actual API Gateway endpoint
-// When using SAM Local, set this to 'http://localhost:7777' to use the Lambda API
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+// API Base URL - detects local vs cloud automatically
+// For local: uses SAM Local API (localhost:7777)
+// For cloud: uses API Gateway URL (set via config or default)
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isLocal
   ? (window.location.port === '7777' ? '' : 'http://localhost:7777')  // Use SAM Local API if not on port 7777
-  : 'https://2n9dsdvfb7.execute-api.us-east-1.amazonaws.com/Prod/'; // API Gateway URL
+  : (window.API_GATEWAY_URL || 'https://2n9dsdvfb7.execute-api.us-east-1.amazonaws.com/Prod/'); // API Gateway URL
 
 // Load increment value from localStorage or default to 12
 function getIncrementValue() {
@@ -119,7 +120,18 @@ const exerciseNames = {
   'pull-ups': 'Pull-Ups',
   'squats': 'Squats',
   'chest-dumbbells': 'Chest Dumbbells',
-  'sit-ups': 'Sit-ups'
+  'sit-ups': 'Sit-ups',
+  'biceps': 'Biceps',
+  'triceps': 'Triceps'
+};
+
+const DEFAULT_EXERCISES = {
+  'pull-ups': 0,
+  'squats': 0,
+  'chest-dumbbells': 0,
+  'sit-ups': 0,
+  'biceps': 0,
+  'triceps': 0
 };
 
 // Helper to build API URL without double slashes
@@ -130,26 +142,45 @@ function buildApiUrl(path) {
   return `${cleanBase}${cleanPath}`;
 }
 
+// Helper to build fetch options with auth header
+function getFetchOptions(method = 'GET', body = null) {
+  const options = {
+    method,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  // Add auth header if available
+  const authHeader = window.cognitoAuth?.getAuthHeader();
+  if (authHeader) {
+    options.headers['Authorization'] = authHeader;
+  }
+  
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+  
+  return options;
+}
+
 // Load all counters on page load
 async function loadCounters() {
   showLoader();
   try {
-    const userId = getUserId();
-    const response = await fetch(buildApiUrl(`/api/counters?userId=${encodeURIComponent(userId)}`));
+    // No userId needed - backend uses Cognito user ID
+    const response = await fetch(buildApiUrl('/api/counters'), getFetchOptions('GET'));
     if (!response.ok) {
+      if (response.status === 401) {
+        // Not authenticated - show auth modal
+        showAuthModal();
+        hideLoader();
+        return;
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     counters = await response.json();
-    
-    // Initialize with default exercises if counters is empty
-    if (!counters || Object.keys(counters).length === 0) {
-      counters = {
-        'pull-ups': 0,
-        'squats': 0,
-        'chest-dumbbells': 0,
-        'sit-ups': 0
-      };
-    }
+    counters = { ...DEFAULT_EXERCISES, ...(counters || {}) };
     
     renderExercises();
   } catch (error) {
@@ -159,12 +190,7 @@ async function loadCounters() {
       alert('⚠️ Cannot connect to API server.\n\nMake sure SAM Local is running:\nnpm run start:sam:watch\n\nOr use the Express server:\nnpm start');
     }
     // Initialize with default exercises on error
-    counters = {
-      'pull-ups': 0,
-      'squats': 0,
-      'chest-dumbbells': 0,
-      'sit-ups': 0
-    };
+    counters = { ...DEFAULT_EXERCISES };
     renderExercises();
   } finally {
     hideLoader();
@@ -359,12 +385,17 @@ async function resetAllCounters() {
   
   showLoader();
   try {
-    const userId = getUserId();
-    const response = await fetch(buildApiUrl('/api/counters/reset'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId })
-    });
+    // No userId needed - backend uses Cognito user ID
+    const response = await fetch(
+      buildApiUrl('/api/counters/reset'),
+      getFetchOptions('POST', {})
+    );
+    
+    if (response.status === 401) {
+      showAuthModal();
+      hideLoader();
+      return;
+    }
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -405,12 +436,18 @@ async function incrementCounter(exercise) {
     
     console.log('Incrementing by:', incrementValue, 'Input value was:', inputValue);
     
-    const userId = getUserId();
-    const response = await fetch(buildApiUrl('/api/counters/increment'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exercise, increment: incrementValue, userId })
-    });
+    // No userId needed - backend uses Cognito user ID
+    const response = await fetch(
+      buildApiUrl('/api/counters/increment'),
+      getFetchOptions('POST', { exercise, increment: incrementValue })
+    );
+    
+    if (response.status === 401) {
+      showAuthModal();
+      hideLoader();
+      return;
+    }
+    
     const data = await response.json();
     counters = data;
     
@@ -556,18 +593,220 @@ document.addEventListener('visibilitychange', () => {
 function displayUserId() {
   const userIdDisplay = document.getElementById('userIdDisplay');
   if (userIdDisplay) {
-    const userId = getUserId();
-    userIdDisplay.textContent = `User: ${userId}`;
+    // Show Cognito user info instead of generated userId
+    window.cognitoAuth.getUserEmail().then(email => {
+      if (email) {
+        userIdDisplay.textContent = `User: ${email}`;
+      }
+    });
   }
 }
 
-// Initialize
-displayUserId();
-loadCounters();
-updateDisplay();
+// Auth UI Functions
+function showAuthModal() {
+  const authModal = document.getElementById('authModal');
+  const mainContainer = document.getElementById('mainContainer');
+  if (authModal) authModal.style.display = 'flex';
+  if (mainContainer) mainContainer.style.display = 'none';
+}
 
-// Re-render exercises when counters are loaded to ensure buttons are set up correctly
-setTimeout(() => {
-  renderExercises();
-}, 100);
+function hideAuthModal() {
+  const authModal = document.getElementById('authModal');
+  const mainContainer = document.getElementById('mainContainer');
+  if (authModal) authModal.style.display = 'none';
+  if (mainContainer) mainContainer.style.display = 'block';
+}
+
+function showAuthError(message) {
+  const errorDiv = document.getElementById('authError');
+  if (errorDiv) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+function hideAuthError() {
+  const errorDiv = document.getElementById('authError');
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
+}
+
+// Initialize authentication UI
+function initAuthUI() {
+  const signInBtn = document.getElementById('signInBtn');
+  const signUpBtn = document.getElementById('signUpBtn');
+  const verifyBtn = document.getElementById('verifyBtn');
+  const signOutBtn = document.getElementById('signOutBtn');
+  const showSignUp = document.getElementById('showSignUp');
+  const showSignIn = document.getElementById('showSignIn');
+  const signInForm = document.getElementById('signInForm');
+  const signUpForm = document.getElementById('signUpForm');
+  const verifyForm = document.getElementById('verifyForm');
+  const authTitle = document.getElementById('authTitle');
+  const userEmail = document.getElementById('userEmail');
+  
+  let pendingEmail = null;
+
+  // Sign In
+  if (signInBtn) {
+    signInBtn.addEventListener('click', async () => {
+      hideAuthError();
+      const email = document.getElementById('signInEmail').value;
+      const password = document.getElementById('signInPassword').value;
+      
+      if (!email || !password) {
+        showAuthError('Please enter email and password');
+        return;
+      }
+      
+      try {
+        await window.cognitoAuth.signIn(email, password);
+        hideAuthModal();
+        await updateUserDisplay();
+        await loadCounters();
+      } catch (error) {
+        showAuthError(error.message || 'Sign in failed');
+      }
+    });
+  }
+
+  // Sign Up
+  if (signUpBtn) {
+    signUpBtn.addEventListener('click', async () => {
+      hideAuthError();
+      const email = document.getElementById('signUpEmail').value;
+      const password = document.getElementById('signUpPassword').value;
+      
+      if (!email || !password) {
+        showAuthError('Please enter email and password');
+        return;
+      }
+      
+      if (password.length < 8) {
+        showAuthError('Password must be at least 8 characters');
+        return;
+      }
+      
+      try {
+        await window.cognitoAuth.signUp(email, password);
+        pendingEmail = email;
+        signUpForm.style.display = 'none';
+        verifyForm.style.display = 'block';
+        authTitle.textContent = 'Verify Email';
+      } catch (error) {
+        showAuthError(error.message || 'Sign up failed');
+      }
+    });
+  }
+
+  // Verify
+  if (verifyBtn) {
+    verifyBtn.addEventListener('click', async () => {
+      hideAuthError();
+      const code = document.getElementById('verifyCode').value;
+      
+      if (!code) {
+        showAuthError('Please enter verification code');
+        return;
+      }
+      
+      try {
+        await window.cognitoAuth.confirmSignUp(pendingEmail, code);
+        // After verification, sign in
+        await window.cognitoAuth.signIn(pendingEmail, document.getElementById('signUpPassword').value);
+        hideAuthModal();
+        await updateUserDisplay();
+        await loadCounters();
+      } catch (error) {
+        showAuthError(error.message || 'Verification failed');
+      }
+    });
+  }
+
+  // Sign Out
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', () => {
+      window.cognitoAuth.signOut();
+      showAuthModal();
+      signInForm.style.display = 'block';
+      signUpForm.style.display = 'none';
+      verifyForm.style.display = 'none';
+      authTitle.textContent = 'Sign In';
+    });
+  }
+
+  // Toggle forms
+  if (showSignUp) {
+    showSignUp.addEventListener('click', (e) => {
+      e.preventDefault();
+      signInForm.style.display = 'none';
+      signUpForm.style.display = 'block';
+      authTitle.textContent = 'Sign Up';
+      hideAuthError();
+    });
+  }
+
+  if (showSignIn) {
+    showSignIn.addEventListener('click', (e) => {
+      e.preventDefault();
+      signUpForm.style.display = 'none';
+      signInForm.style.display = 'block';
+      authTitle.textContent = 'Sign In';
+      hideAuthError();
+    });
+  }
+
+  // Update user email display
+  async function updateUserDisplay() {
+    const email = await window.cognitoAuth.getUserEmail();
+    if (userEmail && email) {
+      userEmail.textContent = email;
+    }
+    displayUserId();
+  }
+
+  return updateUserDisplay;
+}
+
+// Initialize app
+async function initApp() {
+  // Wait for auth module to be available
+  if (!window.cognitoAuth) {
+    console.error('Auth module not loaded');
+    return;
+  }
+  
+  // Initialize auth
+  await window.cognitoAuth.init();
+  
+  // Initialize auth UI
+  const updateUserDisplay = initAuthUI();
+  
+  // Check if authenticated
+  if (window.cognitoAuth.isAuthenticated()) {
+    hideAuthModal();
+    await updateUserDisplay();
+    displayUserId();
+    loadCounters();
+    updateDisplay();
+  } else {
+    showAuthModal();
+  }
+  
+  // Re-render exercises when counters are loaded
+  setTimeout(() => {
+    renderExercises();
+  }, 100);
+}
+
+// Start app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    // Wait a bit for scripts to load
+    setTimeout(initApp, 100);
+  });
+} else {
+  setTimeout(initApp, 100);
+}
 

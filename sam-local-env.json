@@ -2,7 +2,9 @@
   "ExerciseTimerAPI": {
     "SAM_LOCAL": "true",
     "USE_LOCAL_STORAGE": "true",
-    "AWS_REGION": "us-east-1"
+    "AWS_REGION": "us-east-1",
+    "USER_POOL_ID": "us-east-1_ssqT8Os5f",
+    "USER_POOL_CLIENT_ID": "1smbd8prcjtkokvfe8l6anr80n"
   }
 }
 

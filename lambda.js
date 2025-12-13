@@ -4,6 +4,7 @@ const {
   resetCountersHandler
 } = require('./src/handlers');
 const storage = require('./src/storage');
+const { requireAuth } = require('./src/auth');
 
 // CORS headers
 const corsHeaders = {
@@ -43,7 +44,7 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
 
   try {
-    // Handle root path
+    // Handle root path (no auth required)
     if (path === '/' || path === '') {
       return createResponse(200, { 
         message: 'Exercise Timer API',
@@ -55,9 +56,21 @@ exports.handler = async (event) => {
       });
     }
 
+    // Verify authentication for API endpoints
+    const authResult = await requireAuth(event);
+    if (!authResult.authenticated) {
+      return createResponse(401, { 
+        error: 'Unauthorized',
+        message: authResult.error || 'Authentication required'
+      });
+    }
+
+    const cognitoUserId = authResult.user.sub || authResult.user['cognito:username'];
+
     // GET /api/counters
     if (path.includes('/api/counters') && method === 'GET') {
-      const userId = event.queryStringParameters?.userId;
+      // Use Cognito user ID instead of query parameter
+      const userId = `user_${cognitoUserId}`;
       const result = await getCountersHandler(storage, userId);
       return createResponse(result.statusCode, result.body);
     }
@@ -65,15 +78,17 @@ exports.handler = async (event) => {
     // POST /api/counters/increment
     if (path.includes('/api/counters/increment') && method === 'POST') {
       const body = JSON.parse(event.body || '{}');
-      const { exercise, increment, userId } = body;
+      const { exercise, increment } = body;
+      // Use Cognito user ID instead of body parameter
+      const userId = `user_${cognitoUserId}`;
       const result = await incrementCounterHandler(storage, exercise, increment, userId);
       return createResponse(result.statusCode, result.body);
     }
 
     // POST /api/counters/reset
     if (path.includes('/api/counters/reset') && method === 'POST') {
-      const body = JSON.parse(event.body || '{}');
-      const { userId } = body;
+      // Use Cognito user ID instead of body parameter
+      const userId = `user_${cognitoUserId}`;
       console.log('Resetting all counters to zero for user:', userId);
       const result = await resetCountersHandler(storage, userId);
       console.log('Reset result:', JSON.stringify(result.body));

@@ -35,21 +35,12 @@ API_URL=$(aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
   --output text 2>/dev/null || echo "")
 
+# API URL is now set in config.js via deploy.sh, no need to modify app.js
 if [ -z "$API_URL" ]; then
-    echo "⚠️  Warning: Could not get API URL. You'll need to update app.js manually."
+    echo "⚠️  Warning: Could not get API URL from stack."
+    echo "   API URL should be set in public/config.js (done by deploy.sh)"
 else
-    echo "📡 Updating API URL in app.js..."
-    # Backup original app.js
-    cp public/app.js public/app.js.backup
-    
-    # Remove trailing slash from API URL to avoid double slashes
-    API_URL_CLEAN=$(echo "$API_URL" | sed 's|/$||')
-    
-    # Update API_BASE_URL for production (replace the empty string fallback with actual API URL)
-    # This updates the line: : ''; // Set your API Gateway URL here after deployment
-    sed "s|: ''; // Set your API Gateway URL here after deployment|: '$API_URL_CLEAN'; // API Gateway URL|g" public/app.js.backup > public/app.js
-    
-    echo "✅ API URL updated to: $API_URL_CLEAN"
+    echo "📡 API URL: $API_URL (configured in config.js)"
 fi
 
 # Upload files to S3

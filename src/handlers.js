@@ -4,7 +4,9 @@ const DEFAULT_EXERCISES = {
   'pull-ups': 0,
   'squats': 0,
   'chest-dumbbells': 0,
-  'sit-ups': 0
+  'sit-ups': 0,
+  'biceps': 0,
+  'triceps': 0
 };
 
 // Validate and normalize increment value
@@ -51,7 +53,9 @@ async function getCountersHandler(storage, userId) {
   }
   try {
     const counters = await storage.getCounters(userId);
-    return { statusCode: 200, body: counters };
+    const safeCounters = (counters && typeof counters === 'object') ? counters : {};
+    const merged = { ...DEFAULT_EXERCISES, ...safeCounters };
+    return { statusCode: 200, body: merged };
   } catch (error) {
     return { statusCode: 200, body: DEFAULT_EXERCISES };
   }
