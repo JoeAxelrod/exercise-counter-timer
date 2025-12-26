@@ -105,7 +105,7 @@ Resources:
       Runtime: nodejs20.x
       Handler: lambda.handler
       Timeout: 10
-      MemorySize: 128
+      MemorySize: 512
       Environment:
         Variables:
           STAGE: !Ref Stage

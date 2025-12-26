@@ -17,8 +17,14 @@ if (USER_POOL_ID) {
     jwksUri,
     cache: true,
     cacheMaxAge: 86400000, // 24 hours
+    cacheMaxEntries: 5, // Limit cache size
+    jwksRequestsPerMinute: 10, // Rate limit JWKS requests
   });
 }
+
+// Token verification cache (cache verified tokens for 5 minutes)
+const tokenCache = new Map();
+const TOKEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Get signing key from JWKS
 function getKey(header, callback) {
@@ -56,6 +62,14 @@ function verifyToken(token) {
 
     // Remove 'Bearer ' prefix if present
     const cleanToken = token.replace(/^Bearer\s+/i, '');
+    
+    // Check token cache first (use first 50 chars as cache key)
+    const tokenKey = cleanToken.substring(0, 50);
+    const cached = tokenCache.get(tokenKey);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < TOKEN_CACHE_TTL_MS) {
+      return resolve(cached.decoded);
+    }
 
     jwt.verify(
       cleanToken,
@@ -68,6 +82,8 @@ function verifyToken(token) {
         if (err) {
           return reject(err);
         }
+        // Cache the verified token
+        tokenCache.set(tokenKey, { decoded, timestamp: now });
         resolve(decoded);
       }
     );

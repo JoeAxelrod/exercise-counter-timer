@@ -26,6 +26,8 @@ function createResponse(statusCode, body, headers = {}) {
 }
 
 exports.handler = async (event) => {
+  const startTime = Date.now();
+  
   // Simulate network delay in local development
   if (process.env.SAM_LOCAL === 'true') {
     await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
@@ -67,39 +69,47 @@ exports.handler = async (event) => {
 
     const cognitoUserId = authResult.user.sub || authResult.user['cognito:username'];
 
+    let result;
+    
     // GET /api/counters
     if (path.includes('/api/counters') && method === 'GET') {
       // Use Cognito user ID instead of query parameter
       const userId = `user_${cognitoUserId}`;
-      const result = await getCountersHandler(storage, userId);
-      return createResponse(result.statusCode, result.body);
+      result = await getCountersHandler(storage, userId);
     }
-
     // POST /api/counters/increment
-    if (path.includes('/api/counters/increment') && method === 'POST') {
+    else if (path.includes('/api/counters/increment') && method === 'POST') {
       const body = JSON.parse(event.body || '{}');
       const { exercise, increment } = body;
       // Use Cognito user ID instead of body parameter
       const userId = `user_${cognitoUserId}`;
-      const result = await incrementCounterHandler(storage, exercise, increment, userId);
-      return createResponse(result.statusCode, result.body);
+      result = await incrementCounterHandler(storage, exercise, increment, userId);
     }
-
     // POST /api/counters/reset
-    if (path.includes('/api/counters/reset') && method === 'POST') {
+    else if (path.includes('/api/counters/reset') && method === 'POST') {
       // Use Cognito user ID instead of body parameter
       const userId = `user_${cognitoUserId}`;
       console.log('Resetting all counters to zero for user:', userId);
-      const result = await resetCountersHandler(storage, userId);
+      result = await resetCountersHandler(storage, userId);
       console.log('Reset result:', JSON.stringify(result.body));
-      return createResponse(result.statusCode, result.body);
+    }
+    // 404 for unknown routes
+    else {
+      result = { statusCode: 404, body: { error: 'Not found' } };
     }
 
-    // 404 for unknown routes
-    return createResponse(404, { error: 'Not found' });
+    // Log performance metrics
+    const duration = Date.now() - startTime;
+    if (duration > 500) {
+      console.warn(`Slow request detected: ${method} ${path} took ${duration}ms`);
+    }
+    console.log(`Request completed: ${method} ${path} - ${duration}ms - ${result.statusCode}`);
+
+    return createResponse(result.statusCode, result.body);
 
   } catch (error) {
-    console.error('Error:', error);
+    const duration = Date.now() - startTime;
+    console.error(`Error after ${duration}ms:`, error);
     return createResponse(500, { error: 'Internal server error' });
   }
 };
