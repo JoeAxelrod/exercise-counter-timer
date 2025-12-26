@@ -582,10 +582,23 @@ if (resetCountersBtn) {
 }
 
 // Handle tab visibility changes to ensure timer continues accurately
-document.addEventListener('visibilitychange', () => {
+document.addEventListener('visibilitychange', async () => {
   if (!document.hidden) {
     // Tab became visible - update display immediately
     updateDisplay();
+    
+    // Refresh session if authenticated (handles token expiration after hours away)
+    if (window.cognitoAuth && window.cognitoAuth.isAuthenticated()) {
+      try {
+        await window.cognitoAuth.checkSession();
+        // If session check failed, show auth modal
+        if (!window.cognitoAuth.isAuthenticated()) {
+          showAuthModal();
+        }
+      } catch (e) {
+        console.error('Session refresh failed:', e);
+      }
+    }
   }
 });
 
@@ -771,14 +784,20 @@ function initAuthUI() {
 
 // Initialize app
 async function initApp() {
+  showLoader();
   // Wait for auth module to be available
   if (!window.cognitoAuth) {
     console.error('Auth module not loaded');
+    hideLoader();
     return;
   }
   
   // Initialize auth
-  await window.cognitoAuth.init();
+  try {
+    await window.cognitoAuth.init();
+  } catch (e) {
+    console.error('Auth init failed:', e);
+  }
   
   // Initialize auth UI
   const updateUserDisplay = initAuthUI();
@@ -798,6 +817,8 @@ async function initApp() {
   setTimeout(() => {
     renderExercises();
   }, 100);
+
+  hideLoader();
 }
 
 // Start app when DOM is ready

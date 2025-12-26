@@ -36,6 +36,15 @@ class CognitoAuth {
 
   // Initialize Cognito SDK
   async init() {
+    // Re-load config at init time to avoid any script-load timing issues
+    this.loadConfig();
+
+    // In cloud mode, config.js should have set these. If not, wait briefly and retry.
+    if (!this.isLocal && (!this.userPoolId || !this.clientId)) {
+      await this.waitForConfig({ timeoutMs: 2000, pollMs: 50 });
+      this.loadConfig();
+    }
+
     // If no Cognito config, use mock auth (local development fallback)
     if (!this.userPoolId || !this.clientId) {
       if (this.isLocal) {
@@ -61,6 +70,15 @@ class CognitoAuth {
     // Check for existing session
     await this.checkSession();
     return true;
+  }
+
+  async waitForConfig({ timeoutMs = 2000, pollMs = 50 } = {}) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (window.COGNITO_USER_POOL_ID && window.COGNITO_CLIENT_ID) return true;
+      await new Promise(resolve => setTimeout(resolve, pollMs));
+    }
+    return false;
   }
 
   async loadAWSSDK() {
@@ -97,6 +115,7 @@ class CognitoAuth {
     }
     
     // Real Cognito session check (works for both local and cloud)
+    // Note: getSession() automatically refreshes expired tokens if within refresh window
 
     try {
       const poolData = {
@@ -107,19 +126,42 @@ class CognitoAuth {
       const cognitoUser = userPool.getCurrentUser();
 
       if (cognitoUser) {
-        return new Promise((resolve, reject) => {
-          cognitoUser.getSession((err, session) => {
-            if (err || !session.isValid()) {
-              this.signOut();
-              resolve(false);
-              return;
-            }
-            this.currentUser = cognitoUser;
-            this.idToken = session.getIdToken().getJwtToken();
-            this.accessToken = session.getAccessToken().getJwtToken();
-            resolve(true);
+        const tryGetSession = () =>
+          new Promise((resolve) => {
+            cognitoUser.getSession((err, session) => {
+              // If getSession succeeds, session is valid (tokens may have been auto-refreshed)
+              // Only fail if there's an error or no session object
+              if (err || !session) {
+                resolve({ ok: false, err, session: null });
+                return;
+              }
+              // getSession() succeeded - session is valid (even if tokens were just refreshed)
+              resolve({ ok: true, session });
+            });
           });
-        });
+
+        // One retry helps with occasional transient/session-refresh timing issues.
+        let result = await tryGetSession();
+        if (!result.ok) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          result = await tryGetSession();
+        }
+
+        if (!result.ok) {
+          // Only sign out if getSession() explicitly failed (no session or error)
+          // Don't sign out on transient errors - let user retry
+          if (result.err && result.err.message && result.err.message.includes('refresh')) {
+            // Refresh token expired - need to sign in again
+            this.signOut();
+          }
+          return false;
+        }
+
+        // getSession() succeeded - update tokens (they may have been refreshed)
+        this.currentUser = cognitoUser;
+        this.idToken = result.session.getIdToken().getJwtToken();
+        this.accessToken = result.session.getAccessToken().getJwtToken();
+        return true;
       }
     } catch (error) {
       console.error('Error checking session:', error);
